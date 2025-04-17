@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Task Manager</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Times New Roman', Times, serif;
+      background: url('https://www.transparenttextures.com/patterns/diag-stripes-light.png'), linear-gradient(135deg, #ffffff, #e8eff1);
+      background-size: 100%, cover;
+      background-attachment: fixed;
+      height: 100vh;
+      position: relative;
+    }
+
+    .heading {
+      text-align: center;
+      color: white;
+      font-size: 36px;
+      font-weight: bold;
+      padding: 30px 20px 10px 20px;
+      background-color: rgba(0, 0, 128, 0.7);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      letter-spacing: 1px;
+    }
+
+    .container, .login-box {
+      background-color: #ffffffcc;
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    input, select { width: 90%; padding: 5px; }
+    button { padding: 6px 12px; margin-top: 8px; }
+    .hidden { display: none; }
+    .correct { color: green; font-weight: bold; }
+    .incorrect { color: red; font-weight: bold; }
+    .completed { background-color: #d4edda; }
+    .reallocated { background-color: #f8d7da; }
+    .pending { background-color: #fff3cd; }
+    .verification-pending { background-color: #d1ecf1; }
+
+  </style>
+</head>
+<body>
+
+  <div class="heading">FAISAL IHSAN & ASSOCIATES LLP</div>
+
+  <div class="login-box" id="loginBox">
+    <h2>Login</h2>
+    <select id="loginUser">
+      <option value="">-- Select User --</option>
+      <option value="IHSAN">IHSAN (Task Allocator)</option>
+      <option value="HAFEES">HAFEES</option>
+      <option value="MUEES">MUEES</option>
+      <option value="HISANA">HISANA</option>
+      <option value="NEENA NESLIN">NEENA NESLIN</option>
+      <option value="RINSHA">RINSHA</option>
+      <option value="SHAHANA">SHAHANA</option>
+      <option value="FIDHA">FIDHA</option>
+    </select>
+    <input type="password" id="allocatorPassword" class="hidden" placeholder="Enter Password" />
+    <button onclick="login()">Login</button>
+  </div>
+
+  <div class="container hidden" id="taskManager">
+    <h2>Task Manager</h2>
+    <div id="allocatorControls" class="hidden">
+      <select id="assignTo">
+        <option value="">-- Assign Task To --</option>
+        <option value="HAFEES">HAFEES</option>
+        <option value="MUEES">MUEES</option>
+        <option value="HISANA">HISANA</option>
+        <option value="NEENA NESLIN">NEENA NESLIN</option>
+        <option value="RINSHA">RINSHA</option>
+        <option value="SHAHANA">SHAHANA</option>
+        <option value="FIDHA">FIDHA</option>
+      </select>
+      <input type="text" id="newTask" placeholder="Enter task">
+      <button onclick="addTask()">Assign Task</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Sl No.</th>
+          <th>Assigned To</th>
+          <th>Task</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Verification</th>
+          <th>Reason</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="taskTableBody"></tbody>
+    </table>
+
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <script>
+    const allocatorPass = "admin123";
+    let currentUser = null;
+    let taskList = JSON.parse(localStorage.getItem("taskList")) || [];
+
+    function login() {
+      const user = document.getElementById("loginUser").value;
+      const passInput = document.getElementById("allocatorPassword");
+      if (!user) return alert("Select user");
+
+      if (user === "IHSAN") {
+        if (passInput.classList.contains("hidden")) {
+          passInput.classList.remove("hidden");
+          return;
+        }
+        if (passInput.value !== allocatorPass) return alert("Wrong password");
+        currentUser = { name: "IHSAN", isAllocator: true };
+      } else {
+        currentUser = { name: user, isAllocator: false };
+      }
+
+      document.getElementById("loginBox").classList.add("hidden");
+      document.getElementById("taskManager").classList.remove("hidden");
+      if (currentUser.isAllocator) document.getElementById("allocatorControls").classList.remove("hidden");
+
+      renderTasks();
+    }
+
+    function logout() {
+      currentUser = null;
+      document.getElementById("loginBox").classList.remove("hidden");
+      document.getElementById("taskManager").classList.add("hidden");
+      document.getElementById("allocatorPassword").classList.add("hidden");
+      document.getElementById("allocatorPassword").value = "";
+    }
+
+    function addTask() {
+      const person = document.getElementById("assignTo").value;
+      const task = document.getElementById("newTask").value.trim();
+      if (!person || !task) return;
+
+      taskList.push({
+        person, task,
+        date: new Date().toLocaleDateString(),
+        status: "PENDING",
+        reason: "",
+        verificationStatus: ""
+      });
+      localStorage.setItem("taskList", JSON.stringify(taskList));
+      document.getElementById("assignTo").value = "";
+      document.getElementById("newTask").value = "";
+      renderTasks();
+    }
+
+    function saveTask(index) {
+      const statusEl = document.getElementById(`status_${index}`);
+      const verifEl = document.getElementById(`verificationStatus_${index}`);
+      const reasonEl = document.getElementById(`reason_${index}`);
+
+      if (!currentUser.isAllocator && statusEl) {
+        const selectedStatus = statusEl.value;
+        if (selectedStatus !== "COMPLETED" && selectedStatus !== "REALLOCATED") {
+          taskList[index].status = selectedStatus;
+        }
+      }
+
+      if (currentUser.isAllocator && verifEl) {
+        if (taskList[index].status !== "PENDING") {
+          taskList[index].verificationStatus = verifEl.value;
+          if (verifEl.value === "CORRECT") taskList[index].status = "COMPLETED";
+          else if (verifEl.value === "INCORRECT") taskList[index].status = "REALLOCATED";
+        }
+      }
+
+      if (reasonEl) taskList[index].reason = reasonEl.value;
+
+      localStorage.setItem("taskList", JSON.stringify(taskList));
+      renderTasks();
+    }
+
+    function deleteTask(index) {
+      taskList.splice(index, 1);
+      localStorage.setItem("taskList", JSON.stringify(taskList));
+      renderTasks();
+    }
+
+    function renderTasks() {
+      const tbody = document.getElementById("taskTableBody");
+      tbody.innerHTML = "";
+      const visibleTasks = currentUser.isAllocator ? taskList : taskList.filter(t => t.person === currentUser.name);
+
+      visibleTasks.forEach((task, visibleIndex) => {
+        const actualIndex = taskList.indexOf(task);
+        const row = document.createElement("tr");
+
+        let rowClass = "";
+        if (task.status === "COMPLETED") rowClass = "completed";
+        if (task.status === "REALLOCATED") rowClass = "reallocated";
+        if (task.status === "PENDING") rowClass = "pending";
+        if (task.status === "VERIFICATION PENDING") rowClass = "verification-pending";
+        row.className = rowClass;
+
+        row.innerHTML = ` 
+          <td>${actualIndex + 1}</td>
+          <td>${task.person}</td>
+          <td>${task.task}</td>
+          <td>${task.date}</td>
+          <td>
+            <select id="status_${actualIndex}" onchange="saveTask(${actualIndex})"
+              ${currentUser.isAllocator || task.status === "COMPLETED" ? 'disabled' : ''}>
+              <option value="PENDING" ${task.status === "PENDING" ? "selected" : ""}>PENDING</option>
+              <option value="VERIFICATION PENDING" ${task.status === "VERIFICATION PENDING" ? "selected" : ""}>VERIFICATION PENDING</option>
+              <option value="COMPLETED" ${task.status === "COMPLETED" ? "selected" : ""} disabled>COMPLETED</option>
+              <option value="REALLOCATED" ${task.status === "REALLOCATED" ? "selected" : ""} disabled>REALLOCATED</option>
+            </select>
+          </td>
+          <td>
+            ${currentUser.isAllocator ? 
+              `<select id="verificationStatus_${actualIndex}" onchange="saveTask(${actualIndex})"
+                ${task.status === "PENDING" ? 'disabled' : ''}>
+                <option value="">-- Select --</option>
+                <option value="CORRECT" ${task.verificationStatus === "CORRECT" ? "selected" : ""}>✔ Correct</option>
+                <option value="INCORRECT" ${task.verificationStatus === "INCORRECT" ? "selected" : ""}>❌ Incorrect</option>
+              </select>` :
+              (task.verificationStatus === "CORRECT" ? '<span class="correct">✔</span>' :
+               task.verificationStatus === "INCORRECT" ? '<span class="incorrect">❌</span>' : "")
+            }
+          </td>
+          <td><input type="text" id="reason_${actualIndex}" value="${task.reason || ""}" onblur="saveTask(${actualIndex})"></td>
+          <td>${currentUser.isAllocator ? `<button onclick="deleteTask(${actualIndex})">Delete</button>` : ""}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+  </script>
+
+</body>
+</html>
