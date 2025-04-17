@@ -14,7 +14,6 @@
       height: 100vh;
       position: relative;
     }
-
     .heading {
       text-align: center;
       color: white;
@@ -25,7 +24,6 @@
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
       letter-spacing: 1px;
     }
-
     .container, .login-box {
       background-color: #ffffffcc;
       max-width: 900px;
@@ -34,7 +32,6 @@
       border-radius: 12px;
       box-shadow: 0 0 15px rgba(0,0,0,0.1);
     }
-
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
     input, select { width: 90%; padding: 5px; }
@@ -46,11 +43,13 @@
     .reallocated { background-color: #f8d7da; }
     .pending { background-color: #fff3cd; }
     .verification-pending { background-color: #d1ecf1; }
-
   </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
-
   <div class="heading">FAISAL IHSAN & ASSOCIATES LLP</div>
 
   <div class="login-box" id="loginBox">
@@ -106,141 +105,129 @@
     <button onclick="logout()">Logout</button>
   </div>
 
-  <script>
-    const allocatorPass = "admin123";
-    let currentUser = null;
-    let taskList = JSON.parse(localStorage.getItem("taskList")) || [];
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAp19XzD61y6c7-zM0ga81opz8qbabPuR4",
+    authDomain: "task-manager-13bf5.firebaseapp.com",
+    projectId: "task-manager-13bf5",
+    storageBucket: "task-manager-13bf5.appspot.com",
+    messagingSenderId: "713486818209",
+    appId: "1:713486818209:web:2be0f90bcbc8b2f13c89e0",
+    measurementId: "G-K5NWB2GM3K"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-    function login() {
-      const user = document.getElementById("loginUser").value;
-      const passInput = document.getElementById("allocatorPassword");
-      if (!user) return alert("Select user");
+  const allocatorPass = "admin123";
+  let currentUser = null;
 
-      if (user === "IHSAN") {
-        if (passInput.classList.contains("hidden")) {
-          passInput.classList.remove("hidden");
-          return;
-        }
-        if (passInput.value !== allocatorPass) return alert("Wrong password");
-        currentUser = { name: "IHSAN", isAllocator: true };
-      } else {
-        currentUser = { name: user, isAllocator: false };
+  function login() {
+    const user = document.getElementById("loginUser").value;
+    const passInput = document.getElementById("allocatorPassword");
+    if (!user) return alert("Select user");
+
+    if (user === "IHSAN") {
+      if (passInput.classList.contains("hidden")) {
+        passInput.classList.remove("hidden");
+        return;
       }
-
-      document.getElementById("loginBox").classList.add("hidden");
-      document.getElementById("taskManager").classList.remove("hidden");
-      if (currentUser.isAllocator) document.getElementById("allocatorControls").classList.remove("hidden");
-
-      renderTasks();
+      if (passInput.value !== allocatorPass) return alert("Wrong password");
+      currentUser = { name: "IHSAN", isAllocator: true };
+    } else {
+      currentUser = { name: user, isAllocator: false };
     }
 
-    function logout() {
-      currentUser = null;
-      document.getElementById("loginBox").classList.remove("hidden");
-      document.getElementById("taskManager").classList.add("hidden");
-      document.getElementById("allocatorPassword").classList.add("hidden");
-      document.getElementById("allocatorPassword").value = "";
-    }
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("taskManager").classList.remove("hidden");
+    if (currentUser.isAllocator) document.getElementById("allocatorControls").classList.remove("hidden");
 
-    function addTask() {
-      const person = document.getElementById("assignTo").value;
-      const task = document.getElementById("newTask").value.trim();
-      if (!person || !task) return;
+    db.collection("tasks").onSnapshot(() => renderTasks());
+  }
 
-      taskList.push({
-        person, task,
-        date: new Date().toLocaleDateString(),
-        status: "PENDING",
-        reason: "",
-        verificationStatus: ""
-      });
-      localStorage.setItem("taskList", JSON.stringify(taskList));
-      document.getElementById("assignTo").value = "";
-      document.getElementById("newTask").value = "";
-      renderTasks();
-    }
+  function logout() {
+    currentUser = null;
+    document.getElementById("loginBox").classList.remove("hidden");
+    document.getElementById("taskManager").classList.add("hidden");
+    document.getElementById("allocatorPassword").classList.add("hidden");
+    document.getElementById("allocatorPassword").value = "";
+  }
 
-    function saveTask(index) {
-      const statusEl = document.getElementById(`status_${index}`);
-      const verifEl = document.getElementById(`verificationStatus_${index}`);
-      const reasonEl = document.getElementById(`reason_${index}`);
+  async function addTask() {
+    const person = document.getElementById("assignTo").value;
+    const task = document.getElementById("newTask").value.trim();
+    if (!person || !task) return;
 
-      if (!currentUser.isAllocator && statusEl) {
-        const selectedStatus = statusEl.value;
-        if (selectedStatus !== "COMPLETED" && selectedStatus !== "REALLOCATED") {
-          taskList[index].status = selectedStatus;
-        }
-      }
+    await db.collection("tasks").add({
+      person, task,
+      date: new Date().toLocaleDateString(),
+      status: "PENDING",
+      reason: "",
+      verificationStatus: ""
+    });
 
-      if (currentUser.isAllocator && verifEl) {
-        if (taskList[index].status !== "PENDING") {
-          taskList[index].verificationStatus = verifEl.value;
-          if (verifEl.value === "CORRECT") taskList[index].status = "COMPLETED";
-          else if (verifEl.value === "INCORRECT") taskList[index].status = "REALLOCATED";
-        }
-      }
+    document.getElementById("assignTo").value = "";
+    document.getElementById("newTask").value = "";
+  }
 
-      if (reasonEl) taskList[index].reason = reasonEl.value;
+  async function saveTask(id, task) {
+    await db.collection("tasks").doc(id).update(task);
+  }
 
-      localStorage.setItem("taskList", JSON.stringify(taskList));
-      renderTasks();
-    }
+  async function deleteTask(id) {
+    await db.collection("tasks").doc(id).delete();
+  }
 
-    function deleteTask(index) {
-      taskList.splice(index, 1);
-      localStorage.setItem("taskList", JSON.stringify(taskList));
-      renderTasks();
-    }
+  async function renderTasks() {
+    const tbody = document.getElementById("taskTableBody");
+    tbody.innerHTML = "";
 
-    function renderTasks() {
-      const tbody = document.getElementById("taskTableBody");
-      tbody.innerHTML = "";
-      const visibleTasks = currentUser.isAllocator ? taskList : taskList.filter(t => t.person === currentUser.name);
+    const snapshot = await db.collection("tasks").get();
+    const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      visibleTasks.forEach((task, visibleIndex) => {
-        const actualIndex = taskList.indexOf(task);
-        const row = document.createElement("tr");
+    const visibleTasks = currentUser.isAllocator ? tasks : tasks.filter(t => t.person === currentUser.name);
 
-        let rowClass = "";
-        if (task.status === "COMPLETED") rowClass = "completed";
-        if (task.status === "REALLOCATED") rowClass = "reallocated";
-        if (task.status === "PENDING") rowClass = "pending";
-        if (task.status === "VERIFICATION PENDING") rowClass = "verification-pending";
-        row.className = rowClass;
+    visibleTasks.forEach((task, index) => {
+      const row = document.createElement("tr");
+      let rowClass = "";
+      if (task.status === "COMPLETED") rowClass = "completed";
+      if (task.status === "REALLOCATED") rowClass = "reallocated";
+      if (task.status === "PENDING") rowClass = "pending";
+      if (task.status === "VERIFICATION PENDING") rowClass = "verification-pending";
+      row.className = rowClass;
 
-        row.innerHTML = ` 
-          <td>${actualIndex + 1}</td>
-          <td>${task.person}</td>
-          <td>${task.task}</td>
-          <td>${task.date}</td>
-          <td>
-            <select id="status_${actualIndex}" onchange="saveTask(${actualIndex})"
-              ${currentUser.isAllocator || task.status === "COMPLETED" ? 'disabled' : ''}>
-              <option value="PENDING" ${task.status === "PENDING" ? "selected" : ""}>PENDING</option>
-              <option value="VERIFICATION PENDING" ${task.status === "VERIFICATION PENDING" ? "selected" : ""}>VERIFICATION PENDING</option>
-              <option value="COMPLETED" ${task.status === "COMPLETED" ? "selected" : ""} disabled>COMPLETED</option>
-              <option value="REALLOCATED" ${task.status === "REALLOCATED" ? "selected" : ""} disabled>REALLOCATED</option>
-            </select>
-          </td>
-          <td>
-            ${currentUser.isAllocator ? 
-              `<select id="verificationStatus_${actualIndex}" onchange="saveTask(${actualIndex})"
-                ${task.status === "PENDING" ? 'disabled' : ''}>
-                <option value="">-- Select --</option>
-                <option value="CORRECT" ${task.verificationStatus === "CORRECT" ? "selected" : ""}>✔ Correct</option>
-                <option value="INCORRECT" ${task.verificationStatus === "INCORRECT" ? "selected" : ""}>❌ Incorrect</option>
-              </select>` :
-              (task.verificationStatus === "CORRECT" ? '<span class="correct">✔</span>' :
-               task.verificationStatus === "INCORRECT" ? '<span class="incorrect">❌</span>' : "")
-            }
-          </td>
-          <td><input type="text" id="reason_${actualIndex}" value="${task.reason || ""}" onblur="saveTask(${actualIndex})"></td>
-          <td>${currentUser.isAllocator ? `<button onclick="deleteTask(${actualIndex})">Delete</button>` : ""}</td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-  </script>
+      row.innerHTML = `
+        <td>${index + 1}</td>
+        <td>${task.person}</td>
+        <td>${task.task}</td>
+        <td>${task.date}</td>
+        <td>
+          <select onchange="saveTask('${task.id}', { status: this.value })"
+            ${currentUser.isAllocator || task.status === "COMPLETED" ? 'disabled' : ''}>
+            <option value="PENDING" ${task.status === "PENDING" ? "selected" : ""}>PENDING</option>
+            <option value="VERIFICATION PENDING" ${task.status === "VERIFICATION PENDING" ? "selected" : ""}>VERIFICATION PENDING</option>
+            <option value="COMPLETED" ${task.status === "COMPLETED" ? "selected" : ""} disabled>COMPLETED</option>
+            <option value="REALLOCATED" ${task.status === "REALLOCATED" ? "selected" : ""} disabled>REALLOCATED</option>
+          </select>
+        </td>
+        <td>
+          ${currentUser.isAllocator ? 
+            `<select onchange="saveTask('${task.id}', { verificationStatus: this.value })"
+              ${task.status === "PENDING" ? 'disabled' : ''}>
+              <option value="">-- Select --</option>
+              <option value="CORRECT" ${task.verificationStatus === "CORRECT" ? "selected" : ""}>✔ Correct</option>
+              <option value="INCORRECT" ${task.verificationStatus === "INCORRECT" ? "selected" : ""}>❌ Incorrect</option>
+            </select>` :
+            (task.verificationStatus === "CORRECT" ? '<span class="correct">✔</span>' :
+            task.verificationStatus === "INCORRECT" ? '<span class="incorrect">❌</span>' : "")
+          }
+        </td>
+        <td><input type="text" value="${task.reason || ""}" onblur="saveTask('${task.id}', { reason: this.value })"></td>
+        <td>${currentUser.isAllocator ? <button onclick="deleteTask('${task.id}')">Delete</button> : ""}</td>
+      `;
+      tbody.appendChild(row);
+    });
+  }
+</script>
 
 </body>
 </html>
